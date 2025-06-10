@@ -34,7 +34,7 @@ class AppProviders extends ChangeNotifier {
     // Initialize services
     _tokenManager = TokenManagerRepository(prefs);
     _apiService = ApiService(
-      baseUrl:  "http://192.168.8.73:8080/api/", 
+      baseUrl:  "http://192.168.8.73:3000/api", 
       tokenManager: _tokenManager,
     );
 
