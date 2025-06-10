@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:hobby_reads_flutter/data/api/api_service.dart';
 import 'package:hobby_reads_flutter/data/model/book_model.dart';
 import 'package:hobby_reads_flutter/data/model/review_model.dart';
@@ -11,152 +12,275 @@ class BookRepository {
   // Book Management
   Future<List<BookModel>> getBooks({
     int page = 1,
-    int limit = 10,
+    int limit = 20,
     String? search,
     String? genre,
-    String? author,
-    String? sortBy,
-    String? sortOrder,
+    String? status,
   }) async {
     try {
-      final queryParams = {
+      final queryParams = <String, String>{
         'page': page.toString(),
         'limit': limit.toString(),
-        if (search != null) 'search': search,
-        if (genre != null) 'genre': genre,
-        if (author != null) 'author': author,
-        if (sortBy != null) 'sortBy': sortBy,
-        if (sortOrder != null) 'sortOrder': sortOrder,
       };
+      
+      if (search != null && search.isNotEmpty) {
+        queryParams['search'] = search;
+      }
+      if (genre != null && genre.isNotEmpty) {
+        queryParams['genre'] = genre;
+      }
+      if (status != null && status.isNotEmpty) {
+        queryParams['status'] = status;
+      }
 
       final response = await _apiService.get(
-        '/books?${Uri(queryParameters: queryParams).query}',
+        '/books',
+        queryParams: queryParams,
       );
 
-      return (response['data'] as List)
-          .map((book) => BookModel.fromJson(book))
-          .toList();
+      // Handle different response formats
+      if (response is List) {
+        return response.map((book) => BookModel.fromJson(book as Map<String, dynamic>)).toList();
+      } else if (response is Map && response.containsKey('data')) {
+        return (response['data'] as List)
+            .map((book) => BookModel.fromJson(book))
+            .toList();
+      } else if (response is Map && response.containsKey('books')) {
+        return (response['books'] as List)
+            .map((book) => BookModel.fromJson(book))
+            .toList();
+      }
+      
+      return [];
     } catch (e) {
-      throw _handleBookError(e);
+      print('Get books error: $e');
+      return [];
     }
   }
 
-  Future<BookModel> getBookById(String bookId) async {
+  Future<List<BookModel>> getMyBooks() async {
+    try {
+      final response = await _apiService.get('/books/my');
+      
+      if (response is List) {
+        return response.map((book) => BookModel.fromJson(book as Map<String, dynamic>)).toList();
+      } else if (response is Map && response.containsKey('books')) {
+        return (response['books'] as List)
+            .map((book) => BookModel.fromJson(book))
+            .toList();
+      }
+      
+      return [];
+    } catch (e) {
+      print('Get my books error: $e');
+      return [];
+    }
+  }
+
+  Future<BookModel?> getBookById(int bookId) async {
     try {
       final response = await _apiService.get('/books/$bookId');
-      return BookModel.fromJson(response['data']);
+      
+      if (response is Map) {
+        if (response.containsKey('book')) {
+          return BookModel.fromJson(response['book'] as Map<String, dynamic>);
+        } else if (response.containsKey('data')) {
+          return BookModel.fromJson(response['data'] as Map<String, dynamic>);
+        } else {
+          return BookModel.fromJson(response as Map<String, dynamic>);
+        }
+      }
+      
+      return null;
     } catch (e) {
-      throw _handleBookError(e);
+      print('Get book by ID error: $e');
+      return null;
     }
   }
 
-  Future<BookModel> addBook({
+  Future<BookModel?> addBook({
     required String title,
     required String author,
-    required String isbn,
     required String description,
-    required List<String> genres,
-    required int publishedYear,
-    String? coverImage,
-    int? pageCount,
-    String? publisher,
-    String? language,
+    String? genre,
+    String? bookCondition,
+    String status = 'Available',
+    File? coverImage,
   }) async {
     try {
-      final response = await _apiService.post(
-        '/books',
-        body: {
-          'title': title,
-          'author': author,
-          'isbn': isbn,
-          'description': description,
-          'genres': genres,
-          'publishedYear': publishedYear,
-          if (coverImage != null) 'coverImage': coverImage,
-          if (pageCount != null) 'pageCount': pageCount,
-          if (publisher != null) 'publisher': publisher,
-          if (language != null) 'language': language,
-        },
-      );
-      return BookModel.fromJson(response['data']);
+      // If there's an image, we need to use multipart
+      if (coverImage != null) {
+        final response = await _apiService.uploadFile(
+          '/books',
+          await coverImage.readAsBytes(),
+          'cover_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          queryParams: {
+            'title': title,
+            'author': author,
+            'description': description,
+            'status': status,
+            'bookCondition': bookCondition ?? 'Good',
+            if (genre != null) 'genre': genre,
+          },
+        );
+        
+        if (response is Map) {
+          if (response.containsKey('book')) {
+            return BookModel.fromJson(response['book']);
+          } else if (response.containsKey('data')) {
+            return BookModel.fromJson(response['data']);
+          }
+        }
+      } else {
+        // Regular JSON request without image
+        final response = await _apiService.post(
+          '/books',
+          body: {
+            'title': title,
+            'author': author,
+            'description': description,
+            'status': status,
+            'bookCondition': bookCondition ?? 'Good',
+            if (genre != null) 'genre': genre,
+          },
+        );
+        
+        if (response is Map) {
+          if (response.containsKey('book')) {
+            return BookModel.fromJson(response['book'] as Map<String, dynamic>);
+          } else if (response.containsKey('data')) {
+            return BookModel.fromJson(response['data'] as Map<String, dynamic>);
+          } else {
+            return BookModel.fromJson(response as Map<String, dynamic>);
+          }
+        }
+      }
+      
+      return null;
     } catch (e) {
-      throw _handleBookError(e);
+      print('Add book error: $e');
+      if (e.toString().contains('ApiException')) {
+        final errorMatch = RegExp(r'\[(\d+)\] (.+)').firstMatch(e.toString());
+        if (errorMatch != null) {
+          final statusCode = int.parse(errorMatch.group(1)!);
+          final message = errorMatch.group(2)!;
+          
+          switch (statusCode) {
+            case 400:
+              throw Exception('Invalid book information. Please check all required fields.');
+            case 401:
+              throw Exception('You must be logged in to add books.');
+            case 413:
+              throw Exception('Book cover image is too large. Please choose a smaller image.');
+            case 500:
+              throw Exception('Server error occurred. Please try again later.');
+            default:
+              throw Exception(message.isNotEmpty ? message : 'Failed to add book. Please try again.');
+          }
+        }
+      }
+      
+      if (e.toString().contains('Cannot connect to server')) {
+        throw Exception('Cannot connect to server. Please check your internet connection.');
+      }
+      
+      throw Exception('Failed to add book. Please try again.');
     }
   }
 
-  Future<BookModel> updateBook({
-    required String bookId,
+  Future<BookModel?> updateBook({
+    required int bookId,
     String? title,
     String? author,
-    String? isbn,
     String? description,
-    List<String>? genres,
-    int? publishedYear,
-    String? coverImage,
-    int? pageCount,
-    String? publisher,
-    String? language,
+    String? genre,
+    String? bookCondition,
+    String? status,
+    File? coverImage,
   }) async {
     try {
-      final response = await _apiService.patch(
+      final Map<String, dynamic> body = {};
+      
+      if (title != null) body['title'] = title;
+      if (author != null) body['author'] = author;
+      if (description != null) body['description'] = description;
+      if (genre != null) body['genre'] = genre;
+      if (bookCondition != null) body['bookCondition'] = bookCondition;
+      if (status != null) body['status'] = status;
+      
+      final response = await _apiService.put(
         '/books/$bookId',
-        body: {
-          if (title != null) 'title': title,
-          if (author != null) 'author': author,
-          if (isbn != null) 'isbn': isbn,
-          if (description != null) 'description': description,
-          if (genres != null) 'genres': genres,
-          if (publishedYear != null) 'publishedYear': publishedYear,
-          if (coverImage != null) 'coverImage': coverImage,
-          if (pageCount != null) 'pageCount': pageCount,
-          if (publisher != null) 'publisher': publisher,
-          if (language != null) 'language': language,
-        },
+        body: body,
       );
-      return BookModel.fromJson(response['data']);
+      
+      if (response is Map) {
+        if (response.containsKey('book')) {
+          return BookModel.fromJson(response['book'] as Map<String, dynamic>);
+        } else if (response.containsKey('data')) {
+          return BookModel.fromJson(response['data'] as Map<String, dynamic>);
+        } else {
+          return BookModel.fromJson(response as Map<String, dynamic>);
+        }
+      }
+      
+      return null;
     } catch (e) {
-      throw _handleBookError(e);
+      print('Update book error: $e');
+      throw Exception('Failed to update book. Please try again.');
     }
   }
 
-  Future<void> deleteBook(String bookId) async {
+  Future<bool> deleteBook(int bookId) async {
     try {
       await _apiService.delete('/books/$bookId');
+      return true;
     } catch (e) {
-      throw _handleBookError(e);
+      print('Delete book error: $e');
+      if (e.toString().contains('ApiException')) {
+        final errorMatch = RegExp(r'\[(\d+)\] (.+)').firstMatch(e.toString());
+        if (errorMatch != null) {
+          final statusCode = int.parse(errorMatch.group(1)!);
+          final message = errorMatch.group(2)!;
+          
+          switch (statusCode) {
+            case 403:
+              throw Exception('You can only delete your own books.');
+            case 404:
+              throw Exception('Book not found.');
+            case 500:
+              throw Exception('Server error occurred. Please try again later.');
+            default:
+              throw Exception(message.isNotEmpty ? message : 'Failed to delete book.');
+          }
+        }
+      }
+      
+      throw Exception('Failed to delete book. Please try again.');
     }
   }
 
   // Review Management
-  Future<List<ReviewModel>> getBookReviews({
-    required String bookId,
-    int page = 1,
-    int limit = 10,
-    String? sortBy,
-    String? sortOrder,
-  }) async {
+  Future<List<Review>> getBookReviews(int bookId) async {
     try {
-      final queryParams = {
-        'page': page.toString(),
-        'limit': limit.toString(),
-        if (sortBy != null) 'sortBy': sortBy,
-        if (sortOrder != null) 'sortOrder': sortOrder,
-      };
-
-      final response = await _apiService.get(
-        '/books/$bookId/reviews?${Uri(queryParameters: queryParams).query}',
-      );
-
-      return (response['data'] as List)
-          .map((review) => ReviewModel.fromJson(review))
-          .toList();
+      final response = await _apiService.get('/books/$bookId/reviews');
+      
+      if (response is List) {
+        return response.map((review) => Review.fromJson(review as Map<String, dynamic>)).toList();
+      } else if (response is Map && response.containsKey('reviews')) {
+        return (response['reviews'] as List)
+            .map((review) => Review.fromJson(review as Map<String, dynamic>))
+            .toList();
+      }
+      
+      return [];
     } catch (e) {
-      throw _handleBookError(e);
+      print('Get book reviews error: $e');
+      return [];
     }
   }
 
-  Future<ReviewModel> addReview({
-    required String bookId,
+  Future<Review?> addReview({
+    required int bookId,
     required int rating,
     required String comment,
   }) async {
@@ -168,40 +292,120 @@ class BookRepository {
           'comment': comment,
         },
       );
-      return ReviewModel.fromJson(response['data']);
+      
+      if (response is Map) {
+        if (response.containsKey('review')) {
+          return Review.fromJson(response['review'] as Map<String, dynamic>);
+        } else if (response.containsKey('data')) {
+          return Review.fromJson(response['data'] as Map<String, dynamic>);
+        } else {
+          return Review.fromJson(response as Map<String, dynamic>);
+        }
+      }
+      
+      return null;
     } catch (e) {
-      throw _handleBookError(e);
+      print('Add review error: $e');
+      if (e.toString().contains('ApiException')) {
+        final errorMatch = RegExp(r'\[(\d+)\] (.+)').firstMatch(e.toString());
+        if (errorMatch != null) {
+          final statusCode = int.parse(errorMatch.group(1)!);
+          final message = errorMatch.group(2)!;
+          
+          switch (statusCode) {
+            case 400:
+              if (message.contains('already reviewed')) {
+                throw Exception('You have already reviewed this book.');
+              }
+              throw Exception('Invalid review data. Rating must be between 1 and 5.');
+            case 401:
+              throw Exception('You must be logged in to add reviews.');
+            case 409:
+              throw Exception('You have already reviewed this book.');
+            default:
+              throw Exception(message.isNotEmpty ? message : 'Failed to add review.');
+          }
+        }
+      }
+      
+      throw Exception('Failed to add review. Please try again.');
     }
   }
 
-  Future<ReviewModel> updateReview({
-    required String bookId,
-    required String reviewId,
-    int? rating,
-    String? comment,
-  }) async {
-    try {
-      final response = await _apiService.patch(
-        '/books/$bookId/reviews/$reviewId',
-        body: {
-          if (rating != null) 'rating': rating,
-          if (comment != null) 'comment': comment,
-        },
-      );
-      return ReviewModel.fromJson(response['data']);
-    } catch (e) {
-      throw _handleBookError(e);
-    }
-  }
-
-  Future<void> deleteReview({
-    required String bookId,
-    required String reviewId,
+  Future<bool> deleteReview({
+    required int bookId,
+    required int reviewId,
   }) async {
     try {
       await _apiService.delete('/books/$bookId/reviews/$reviewId');
+      return true;
     } catch (e) {
-      throw _handleBookError(e);
+      print('Delete review error: $e');
+      throw Exception('Failed to delete review. Please try again.');
+    }
+  }
+
+  // Search functionality
+  Future<List<BookModel>> searchBooks(String query) async {
+    try {
+      final response = await _apiService.get(
+        '/books/search',
+        queryParams: {'q': query},
+      );
+      
+      if (response is List) {
+        return response.map((book) => BookModel.fromJson(book)).toList();
+      } else if (response is Map && response.containsKey('books')) {
+        return (response['books'] as List)
+            .map((book) => BookModel.fromJson(book))
+            .toList();
+      }
+      
+      return [];
+    } catch (e) {
+      print('Search books error: $e');
+      return [];
+    }
+  }
+
+  // Get available genres
+  Future<List<String>> getGenres() async {
+    try {
+      final response = await _apiService.get('/books/genres');
+      
+      if (response is List) {
+        return response.cast<String>();
+      } else if (response is Map && response.containsKey('genres')) {
+        return (response['genres'] as List).cast<String>();
+      }
+      
+      return [
+        'Fiction',
+        'Mystery',
+        'Science Fiction',
+        'Romance',
+        'Biography',
+        'History',
+        'Self-Help',
+        'Comic',
+        'Fantasy',
+        'Non-Fiction',
+      ];
+    } catch (e) {
+      print('Get genres error: $e');
+      // Return default genres if API fails
+      return [
+        'Fiction',
+        'Mystery',
+        'Science Fiction',
+        'Romance',
+        'Biography',
+        'History',
+        'Self-Help',
+        'Comic',
+        'Fantasy',
+        'Non-Fiction',
+      ];
     }
   }
 

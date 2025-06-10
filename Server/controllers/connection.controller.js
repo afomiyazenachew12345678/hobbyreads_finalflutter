@@ -2,6 +2,7 @@
 exports.getAcceptedConnections = async (req, res) => {
   try {
     const userId = req.userId; // From auth middleware
+    console.log('getAcceptedConnections called for userId:', userId);
     const pool = global.db;
 
     // Get only accepted connections where user is either requester or recipient
@@ -18,6 +19,8 @@ exports.getAcceptedConnections = async (req, res) => {
        ORDER BY c.updatedAt DESC`,
       [userId, userId, userId, userId]
     );
+
+    console.log('Found accepted connections:', connections.length);
 
     // Format the response to match the expected Connection model
     const formattedConnections = await Promise.all(
@@ -73,8 +76,10 @@ exports.getAcceptedConnections = async (req, res) => {
       })
     );
 
+    console.log('Sending accepted connections:', formattedConnections.length);
     res.status(200).send(formattedConnections);
   } catch (err) {
+    console.error('Error in getAcceptedConnections:', err);
     res.status(500).send({
       message:
         err.message ||
@@ -87,6 +92,7 @@ exports.getAcceptedConnections = async (req, res) => {
 exports.getPendingConnections = async (req, res) => {
   try {
     const userId = req.userId; // From auth middleware
+    console.log('getPendingConnections called for userId:', userId);
     const pool = global.db;
 
     // Get only pending connections where user is the recipient
@@ -99,6 +105,8 @@ exports.getPendingConnections = async (req, res) => {
        ORDER BY c.createdAt DESC`,
       [userId]
     );
+
+    console.log('Found pending connections:', connections.length);
 
     // Format the response to match the expected Connection model
     const formattedConnections = await Promise.all(
@@ -151,8 +159,10 @@ exports.getPendingConnections = async (req, res) => {
       })
     );
 
+    console.log('Sending formatted connections:', formattedConnections.length);
     res.status(200).send(formattedConnections);
   } catch (err) {
+    console.error('Error in getPendingConnections:', err);
     res.status(500).send({
       message:
         err.message ||
@@ -165,6 +175,7 @@ exports.getPendingConnections = async (req, res) => {
 exports.getSuggestedConnections = async (req, res) => {
   try {
     const userId = req.userId; // From auth middleware
+    console.log('getSuggestedConnections called for userId:', userId);
     const pool = global.db;
 
     // Get users who are not already connected with the current user
@@ -179,6 +190,8 @@ exports.getSuggestedConnections = async (req, res) => {
        LIMIT 20`,
       [userId, userId, userId, userId]
     );
+
+    console.log('Found suggested users:', users.length);
 
     // Format the response to match the expected Connection model
     const formattedSuggestions = await Promise.all(
@@ -232,8 +245,10 @@ exports.getSuggestedConnections = async (req, res) => {
     // Sort by match percentage (highest first)
     formattedSuggestions.sort((a, b) => b.matchPercentage - a.matchPercentage);
 
+    console.log('Sending suggested connections:', formattedSuggestions.length);
     res.status(200).send(formattedSuggestions);
   } catch (err) {
+    console.error('Error in getSuggestedConnections:', err);
     res.status(500).send({
       message:
         err.message ||

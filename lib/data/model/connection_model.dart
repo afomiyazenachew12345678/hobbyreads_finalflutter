@@ -2,38 +2,49 @@ import 'package:hobby_reads_flutter/data/model/auth_model.dart';
 
 class ConnectionModel {
   final String id;
-  final AuthModel user;
+  final String userId;
+  final String? connectedUserId;
   final String status;
+  final String name;
+  final String username;
+  final String bio;
+  final List<String> hobbies;
+  final int matchPercentage;
   final DateTime createdAt;
   final DateTime? updatedAt;
-  final String? catchPhrase;
-  final List<String>? sharedInterests;
-  final Map<String, dynamic>? metadata;
 
   ConnectionModel({
     required this.id,
-    required this.user,
+    required this.userId,
+    this.connectedUserId,
     required this.status,
+    required this.name,
+    required this.username,
+    required this.bio,
+    required this.hobbies,
+    required this.matchPercentage,
     required this.createdAt,
     this.updatedAt,
-    this.catchPhrase,
-    this.sharedInterests,
-    this.metadata,
   });
 
   factory ConnectionModel.fromJson(Map<String, dynamic> json) {
     try {
       return ConnectionModel(
-        id: json['id'],
-        user: AuthModel.fromJson(json['user']),
-        status: json['status'],
-        createdAt: DateTime.parse(json['createdAt']),
-        updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null,
-        catchPhrase: json['catchPhrase'],
-        sharedInterests: json['sharedInterests'] != null
-            ? List<String>.from(json['sharedInterests'])
-            : null,
-        metadata: json['metadata'],
+        id: json['id'].toString(),
+        userId: json['userId'].toString(),
+        connectedUserId: json['connectedUserId']?.toString(),
+        status: json['status'] as String? ?? 'pending',
+        name: json['name'] as String? ?? '',
+        username: json['username'] as String? ?? '',
+        bio: json['bio'] as String? ?? '',
+        hobbies: (json['hobbies'] as List<dynamic>?)?.cast<String>() ?? [],
+        matchPercentage: json['matchPercentage'] as int? ?? 0,
+        createdAt: json['createdAt'] != null 
+          ? DateTime.parse(json['createdAt'] as String)
+          : DateTime.now(),
+        updatedAt: json['updatedAt'] != null 
+          ? DateTime.parse(json['updatedAt'] as String)
+          : null,
       );
     } catch (e) {
       throw FormatException('Failed to parse ConnectionModel from JSON: $e');
@@ -44,13 +55,16 @@ class ConnectionModel {
     try {
       return {
         'id': id,
-        'user': user.toJson(),
+        'userId': userId,
+        'connectedUserId': connectedUserId,
         'status': status,
+        'name': name,
+        'username': username,
+        'bio': bio,
+        'hobbies': hobbies,
+        'matchPercentage': matchPercentage,
         'createdAt': createdAt.toIso8601String(),
         'updatedAt': updatedAt?.toIso8601String(),
-        'catchPhrase': catchPhrase,
-        'sharedInterests': sharedInterests,
-        'metadata': metadata,
       };
     } catch (e) {
       throw FormatException('Failed to convert ConnectionModel to JSON: $e');
@@ -59,33 +73,44 @@ class ConnectionModel {
 
   ConnectionModel copyWith({
     String? id,
-    AuthModel? user,
+    String? userId,
+    String? connectedUserId,
     String? status,
+    String? name,
+    String? username,
+    String? bio,
+    List<String>? hobbies,
+    int? matchPercentage,
     DateTime? createdAt,
     DateTime? updatedAt,
-    String? catchPhrase,
-    List<String>? sharedInterests,
-    Map<String, dynamic>? metadata,
   }) {
     try {
       return ConnectionModel(
         id: id ?? this.id,
-        user: user ?? this.user,
+        userId: userId ?? this.userId,
+        connectedUserId: connectedUserId ?? this.connectedUserId,
         status: status ?? this.status,
+        name: name ?? this.name,
+        username: username ?? this.username,
+        bio: bio ?? this.bio,
+        hobbies: hobbies ?? this.hobbies,
+        matchPercentage: matchPercentage ?? this.matchPercentage,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
-        catchPhrase: catchPhrase ?? this.catchPhrase,
-        sharedInterests: sharedInterests ?? this.sharedInterests,
-        metadata: metadata ?? this.metadata,
       );
     } catch (e) {
       throw FormatException('Failed to create copy of ConnectionModel: $e');
     }
   }
 
+  // Helper getters
+  String get displayName => name.isEmpty ? username : name;
+  String get initial => displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U';
+  List<String> get interests => hobbies;
+
   @override
   String toString() {
-    return 'ConnectionModel(id: $id, user: $user, status: $status, createdAt: $createdAt, updatedAt: $updatedAt, catchPhrase: $catchPhrase, sharedInterests: $sharedInterests, metadata: $metadata)';
+    return 'ConnectionModel(id: $id, userId: $userId, connectedUserId: $connectedUserId, status: $status, name: $name, username: $username, bio: $bio, hobbies: $hobbies, matchPercentage: $matchPercentage, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -93,26 +118,32 @@ class ConnectionModel {
     if (identical(this, other)) return true;
     return other is ConnectionModel &&
         other.id == id &&
-        other.user == user &&
+        other.userId == userId &&
+        other.connectedUserId == connectedUserId &&
         other.status == status &&
+        other.name == name &&
+        other.username == username &&
+        other.bio == bio &&
+        other.hobbies == hobbies &&
+        other.matchPercentage == matchPercentage &&
         other.createdAt == createdAt &&
-        other.updatedAt == updatedAt &&
-        other.catchPhrase == catchPhrase &&
-        other.sharedInterests == sharedInterests &&
-        other.metadata == metadata;
+        other.updatedAt == updatedAt;
   }
 
   @override
   int get hashCode {
     return Object.hash(
       id,
-      user,
+      userId,
+      connectedUserId,
       status,
+      name,
+      username,
+      bio,
+      hobbies,
+      matchPercentage,
       createdAt,
       updatedAt,
-      catchPhrase,
-      sharedInterests,
-      metadata,
     );
   }
 }

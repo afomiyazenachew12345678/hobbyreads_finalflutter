@@ -14,17 +14,13 @@ class ConnectionRepository {
     int limit = 10,
   }) async {
     try {
-      final queryParams = {
-        'page': page.toString(),
-        'limit': limit.toString(),
-      };
+      final response = await _apiService.get('/connections/pending');
 
-      final response = await _apiService.get(
-        '/connections/requests/pending?${Uri(queryParameters: queryParams).query}',
-      );
-
-      return (response['data'] as List)
-          .map((request) => ConnectionModel.fromJson(request))
+      // Backend returns array directly
+      final List<dynamic> connectionsData = response is List ? response : response['data'] ?? [];
+      
+      return connectionsData
+          .map((conn) => ConnectionModel.fromJson(conn as Map<String, dynamic>))
           .toList();
     } catch (e) {
       throw _handleConnectionError(e);
@@ -33,11 +29,8 @@ class ConnectionRepository {
 
   Future<ConnectionModel> sendConnectionRequest(String userId) async {
     try {
-      final response = await _apiService.post(
-        '/connections/requests',
-        body: {'userId': userId},
-      );
-      return ConnectionModel.fromJson(response['data']);
+      final response = await _apiService.post('/connections/$userId');
+      return ConnectionModel.fromJson(_extractData(response));
     } catch (e) {
       throw _handleConnectionError(e);
     }
@@ -49,26 +42,17 @@ class ConnectionRepository {
     String? message,
   }) async {
     try {
-      final response = await _apiService.patch(
-        '/connections/requests/$requestId',
-        body: {
-          'status': accept ? 'accepted' : 'rejected',
-          if (message != null) 'message': message,
-        },
-      );
-      return ConnectionModel.fromJson(response['data']);
+      final endpoint = accept ? '/connections/$requestId/accept' : '/connections/$requestId/reject';
+      final response = await _apiService.put(endpoint, body: {
+        if (message != null) 'message': message,
+      });
+      return ConnectionModel.fromJson(_extractData(response));
     } catch (e) {
       throw _handleConnectionError(e);
     }
   }
 
-  Future<void> cancelRequest(String requestId) async {
-    try {
-      await _apiService.delete('/connections/requests/$requestId');
-    } catch (e) {
-      throw _handleConnectionError(e);
-    }
-  }
+  Future<void> cancelRequest(String requestId) => removeConnection(requestId);
 
   // Connection Management
   Future<List<ConnectionModel>> getConnections({
@@ -77,18 +61,13 @@ class ConnectionRepository {
     String? search,
   }) async {
     try {
-      final queryParams = {
-        'page': page.toString(),
-        'limit': limit.toString(),
-        if (search != null) 'search': search,
-      };
+      final response = await _apiService.get('/connections');
 
-      final response = await _apiService.get(
-        '/connections?${Uri(queryParameters: queryParams).query}',
-      );
-
-      return (response['data'] as List)
-          .map((connection) => ConnectionModel.fromJson(connection))
+      // Backend returns array directly
+      final List<dynamic> connectionsData = response is List ? response : response['data'] ?? [];
+      
+      return connectionsData
+          .map((conn) => ConnectionModel.fromJson(conn as Map<String, dynamic>))
           .toList();
     } catch (e) {
       throw _handleConnectionError(e);
@@ -98,15 +77,15 @@ class ConnectionRepository {
   Future<ConnectionModel> getConnection(String userId) async {
     try {
       final response = await _apiService.get('/connections/$userId');
-      return ConnectionModel.fromJson(response['data']);
+      return ConnectionModel.fromJson(_extractData(response));
     } catch (e) {
       throw _handleConnectionError(e);
     }
   }
 
-  Future<void> removeConnection(String userId) async {
+  Future<void> removeConnection(String connectionId) async {
     try {
-      await _apiService.delete('/connections/$userId');
+      await _apiService.delete('/connections/$connectionId');
     } catch (e) {
       throw _handleConnectionError(e);
     }
@@ -135,7 +114,7 @@ class ConnectionRepository {
   Future<String> getConnectionStatus(String userId) async {
     try {
       final response = await _apiService.get('/connections/status/$userId');
-      return response['data']['status'];
+      return _extractData(response)['status'];
     } catch (e) {
       throw _handleConnectionError(e);
     }
@@ -144,7 +123,7 @@ class ConnectionRepository {
   Future<bool> isConnected(String userId) async {
     try {
       final response = await _apiService.get('/connections/check/$userId');
-      return response['data']['isConnected'];
+      return _extractData(response)['isConnected'];
     } catch (e) {
       throw _handleConnectionError(e);
     }
@@ -153,7 +132,7 @@ class ConnectionRepository {
   Future<bool> isBlocked(String userId) async {
     try {
       final response = await _apiService.get('/connections/blocked/$userId');
-      return response['data']['isBlocked'];
+      return _extractData(response)['isBlocked'];
     } catch (e) {
       throw _handleConnectionError(e);
     }
@@ -165,98 +144,48 @@ class ConnectionRepository {
     int limit = 10,
   }) async {
     try {
-      final queryParams = {
-        'page': page.toString(),
-        'limit': limit.toString(),
-      };
+      final response = await _apiService.get('/connections/suggested');
 
-      final response = await _apiService.get(
-        '/connections/suggestions?${Uri(queryParameters: queryParams).query}',
-      );
-
-      return (response['data'] as List)
-          .map((suggestion) => ConnectionModel.fromJson(suggestion))
+      // Backend returns array directly
+      final List<dynamic> suggestionsData = response is List ? response : response['data'] ?? [];
+      
+      return suggestionsData
+          .map((suggestion) => ConnectionModel.fromJson(suggestion as Map<String, dynamic>))
           .toList();
     } catch (e) {
       throw _handleConnectionError(e);
     }
   }
 
-  // Connection Activity
-  Future<List<Map<String, dynamic>>> getConnectionActivity({
-    required String userId,
-    int page = 1,
-    int limit = 10,
-  }) async {
-    try {
-      final queryParams = {
-        'page': page.toString(),
-        'limit': limit.toString(),
-      };
 
-      final response = await _apiService.get(
-        '/connections/$userId/activity?${Uri(queryParameters: queryParams).query}',
-      );
 
-      return (response['data'] as List).cast<Map<String, dynamic>>();
-    } catch (e) {
-      throw _handleConnectionError(e);
+  // Helper methods
+  Map<String, dynamic> _extractData(dynamic response) {
+    if (response is Map<String, dynamic>) {
+      return response['data'] ?? response;
     }
-  }
-
-  // Connection Settings
-  Future<Map<String, dynamic>> getConnectionSettings() async {
-    try {
-      final response = await _apiService.get('/connections/settings');
-      return response['data'];
-    } catch (e) {
-      throw _handleConnectionError(e);
-    }
-  }
-
-  Future<void> updateConnectionSettings({
-    bool? allowFriendRequests,
-    bool? showOnlineStatus,
-    bool? showReadingActivity,
-    List<String>? privacyLevels,
-  }) async {
-    try {
-      await _apiService.patch(
-        '/connections/settings',
-        body: {
-          if (allowFriendRequests != null)
-            'allowFriendRequests': allowFriendRequests,
-          if (showOnlineStatus != null) 'showOnlineStatus': showOnlineStatus,
-          if (showReadingActivity != null)
-            'showReadingActivity': showReadingActivity,
-          if (privacyLevels != null) 'privacyLevels': privacyLevels,
-        },
-      );
-    } catch (e) {
-      throw _handleConnectionError(e);
-    }
+    return {};
   }
 
   // Error Handling
   String _handleConnectionError(dynamic error) {
-    if (error is ApiException) {
-      switch (error.statusCode) {
-        case 400:
-          return 'Invalid connection request data.';
-        case 401:
-          return 'Authentication required.';
-        case 403:
-          return 'You do not have permission to perform this action.';
-        case 404:
-          return 'User or connection not found.';
-        case 409:
-          return 'Connection request already exists.';
-        case 422:
-          return 'Invalid input data.';
-        case 500:
-          return 'Server error. Please try again later.';
-        default:
-          return error.message;
+    if (error.toString().contains('ApiException')) {
+      // Extract status code if available
+      final errorStr = error.toString();
+      if (errorStr.contains('400')) {
+        return 'Invalid connection request data.';
+      } else if (errorStr.contains('401')) {
+        return 'Authentication required.';
+      } else if (errorStr.contains('403')) {
+        return 'You do not have permission to perform this action.';
+      } else if (errorStr.contains('404')) {
+        return 'User or connection not found.';
+      } else if (errorStr.contains('409')) {
+        return 'Connection request already exists.';
+      } else if (errorStr.contains('422')) {
+        return 'Invalid input data.';
+      } else if (errorStr.contains('500')) {
+        return 'Server error. Please try again later.';
       }
     }
     return 'An unexpected error occurred. Please try again.';

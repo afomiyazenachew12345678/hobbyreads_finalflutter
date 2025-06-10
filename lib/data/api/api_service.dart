@@ -44,13 +44,9 @@ class ApiService {
         headers: await _getHeaders(requiresAuth: requiresAuth),
       );
 
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to get data: ${response.statusCode}');
-      }
+      return _handleResponse(response);
     } catch (e) {
-      throw Exception('Failed to make GET request: $e');
+      throw _handleError(e, 'GET', endpoint);
     }
   }
 
@@ -68,13 +64,9 @@ class ApiService {
         body: body != null ? json.encode(body) : null,
       );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to post data: ${response.statusCode}');
-      }
+      return _handleResponse(response);
     } catch (e) {
-      throw Exception('Failed to make POST request: $e');
+      throw _handleError(e, 'POST', endpoint);
     }
   }
 
@@ -92,13 +84,9 @@ class ApiService {
         body: body != null ? json.encode(body) : null,
       );
 
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to update data: ${response.statusCode}');
-      }
+      return _handleResponse(response);
     } catch (e) {
-      throw Exception('Failed to make PUT request: $e');
+      throw _handleError(e, 'PUT', endpoint);
     }
   }
 
@@ -116,13 +104,9 @@ class ApiService {
         body: body != null ? json.encode(body) : null,
       );
 
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to patch data: ${response.statusCode}');
-      }
+      return _handleResponse(response);
     } catch (e) {
-      throw Exception('Failed to make PATCH request: $e');
+      throw _handleError(e, 'PATCH', endpoint);
     }
   }
 
@@ -138,13 +122,9 @@ class ApiService {
         headers: await _getHeaders(requiresAuth: requiresAuth),
       );
 
-      if (response.statusCode == 200 || response.statusCode == 204) {
-        return response.body.isNotEmpty ? json.decode(response.body) : null;
-      } else {
-        throw Exception('Failed to delete data: ${response.statusCode}');
-      }
+      return _handleResponse(response);
     } catch (e) {
-      throw Exception('Failed to make DELETE request: $e');
+      throw _handleError(e, 'DELETE', endpoint);
     }
   }
 
@@ -185,6 +165,42 @@ class ApiService {
   // Cleanup
   void dispose() {
     _client.close();
+  }
+
+  // Response handling
+  dynamic _handleResponse(http.Response response) {
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      if (response.body.isEmpty) return null;
+      return json.decode(response.body);
+    } else {
+      final errorBody = response.body.isNotEmpty ? json.decode(response.body) : null;
+      final message = errorBody?['message'] ?? 'Unknown error occurred';
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: message,
+        data: errorBody,
+      );
+    }
+  }
+
+  // Error handling
+  Exception _handleError(dynamic error, String method, String endpoint) {
+    if (error is ApiException) {
+      return error;
+    }
+    
+    // Network/connection errors
+    if (error.toString().contains('Failed host lookup') || 
+        error.toString().contains('Connection refused') ||
+        error.toString().contains('No address associated with hostname')) {
+      return Exception('Cannot connect to server. Please check your internet connection and ensure the backend server is running.');
+    }
+    
+    if (error.toString().contains('Connection timed out')) {
+      return Exception('Server request timed out. Please try again.');
+    }
+    
+    return Exception('Failed to make $method request to $endpoint: $error');
   }
 }
 

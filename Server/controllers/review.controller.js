@@ -1,13 +1,14 @@
 // Create a new review
 exports.createReview = async (req, res) => {
     try {
-      const { bookId, rating, comment } = req.body
+      const bookId = req.params.bookId // From URL parameter
+      const { rating, comment } = req.body
       const userId = req.userId // From auth middleware
   
       // Validate request
-      if (!bookId || !rating) {
+      if (!rating) {
         return res.status(400).send({
-          message: "Book ID and rating are required!",
+          message: "Rating is required!",
         })
       }
   
@@ -91,17 +92,23 @@ exports.createReview = async (req, res) => {
         })
       }
   
-      // Get reviews with user info
+      // Get reviews with user info and validate data
       const [reviews] = await pool.query(
         `SELECT r.*, u.username, u.name, u.profilePicture
          FROM reviews r
          JOIN users u ON r.userId = u.id
-         WHERE r.bookId = ?
+         WHERE r.bookId = ? AND r.rating BETWEEN 1 AND 5
          ORDER BY r.createdAt DESC`,
         [bookId],
       )
   
-      res.status(200).send(reviews)
+      // Additional validation to ensure data integrity
+      const validReviews = reviews.filter(review => {
+        return review.rating >= 1 && review.rating <= 5 && 
+               review.bookId && review.userId && review.id;
+      });
+  
+      res.status(200).send(validReviews)
     } catch (err) {
       res.status(500).send({
         message: err.message || "Some error occurred while retrieving reviews.",

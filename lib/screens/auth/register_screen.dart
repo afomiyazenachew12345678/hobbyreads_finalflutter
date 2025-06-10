@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hobby_reads_flutter/providers/auth_providers.dart';
 
-class RegisterScreen extends StatefulWidget {
+class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
 
   @override
-  State<RegisterScreen> createState() => _RegisterScreenState();
+  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> {
+class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -18,6 +20,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final Map<String, bool> _selectedHobbies = {
     'Fiction': false,
     'Mystery': false,
+    'Science Fiction': false,
+    'Romance': false,
+    'Biography': false,
+    'History': false,
+    'Self-Help': false,
     'Comic': false,
   };
 
@@ -31,10 +38,79 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _handleRegister() {
+  Future<void> _handleRegister() async {
     if (_formKey.currentState?.validate() ?? false) {
-      // TODO: Implement registration logic
-      Navigator.pushReplacementNamed(context, '/home');
+      try {
+        final selectedHobbies = _selectedHobbies.entries
+            .where((entry) => entry.value)
+            .map((entry) => entry.key)
+            .toList();
+
+        await ref.read(authProvider.notifier).register(
+          _usernameController.text,
+          _emailController.text,
+          _passwordController.text,
+          _fullNameController.text.isEmpty ? _usernameController.text : _fullNameController.text,
+          hobbies: selectedHobbies.isNotEmpty ? selectedHobbies : null,
+        );
+
+        if (mounted) {
+          // Show success message briefly before navigating
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Registration successful! Welcome to HobbyReads!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+          
+          // Small delay to show the success message
+          await Future.delayed(const Duration(milliseconds: 500));
+          Navigator.pushReplacementNamed(context, '/home');
+        }
+      } catch (e) {
+        if (mounted) {
+          // Clean up the error message
+          String errorMessage = e.toString();
+          
+          // Remove common exception prefixes
+          errorMessage = errorMessage
+              .replaceFirst('Exception: Failed to register: Exception: ', '')
+              .replaceFirst('Exception: ', '')
+              .replaceFirst('Failed to register: ', '');
+          
+          // Show error in a dialog for better visibility
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: const Row(
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.red, size: 24),
+                    SizedBox(width: 8),
+                    Text('Registration Failed'),
+                  ],
+                ),
+                content: Text(
+                  errorMessage,
+                  style: const TextStyle(fontSize: 16),
+                ),
+                actions: [
+                  TextButton(
+                    child: const Text('OK'),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                ],
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              );
+            },
+          );
+        }
+      }
     }
   }
 
@@ -110,6 +186,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           if (value == null || value.isEmpty) {
                             return 'Please enter your username';
                           }
+                          if (value.length < 3) {
+                            return 'Username must be at least 3 characters long';
+                          }
+                          if (value.length > 20) {
+                            return 'Username must be less than 20 characters';
+                          }
+                          // Check for valid characters
+                          final usernameRegex = RegExp(r'^[a-zA-Z0-9_]+$');
+                          if (!usernameRegex.hasMatch(value)) {
+                            return 'Username can only contain letters, numbers, and underscores';
+                          }
                           return null;
                         },
                       ),
@@ -132,8 +219,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           if (value == null || value.isEmpty) {
                             return 'Please enter your email';
                           }
-                          if (!value.contains('@')) {
-                            return 'Please enter a valid email';
+                          // More comprehensive email validation
+                          final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+                          if (!emailRegex.hasMatch(value)) {
+                            return 'Please enter a valid email address (e.g., user@example.com)';
                           }
                           return null;
                         },
@@ -173,7 +262,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             return 'Please enter a password';
                           }
                           if (value.length < 6) {
-                            return 'Password must be at least 6 characters';
+                            return 'Password must be at least 6 characters long';
+                          }
+                          if (value.length > 50) {
+                            return 'Password must be less than 50 characters';
+                          }
+                          // Check for at least one letter and one number for stronger passwords
+                          if (!RegExp(r'^(?=.*[a-zA-Z])(?=.*\d)').hasMatch(value)) {
+                            return 'Password should contain at least one letter and one number';
                           }
                           return null;
                         },
@@ -205,7 +301,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 24),
                       const Text(
-                        'Select Your Hobbies',
+                        'Select Your Hobbies (Optional)',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
@@ -228,9 +324,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         }).toList(),
                       ),
                       const SizedBox(height: 24),
-                      ElevatedButton(
-                        onPressed: _handleRegister,
-                        child: const Text('Register'),
+                      Consumer(
+                        builder: (context, ref, child) {
+                          final authState = ref.watch(authProvider);
+                          return ElevatedButton(
+                            onPressed: authState.isLoading ? null : _handleRegister,
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: authState.isLoading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  )
+                                : const Text('Register'),
+                          );
+                        },
                       ),
                       const SizedBox(height: 16),
                       Row(

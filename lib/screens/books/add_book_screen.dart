@@ -1,16 +1,153 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:hobby_reads_flutter/screens/shared/app_scaffold.dart';
+import 'package:hobby_reads_flutter/providers/book_providers.dart';
 
-class AddBookScreen extends StatefulWidget {
+class AddBookScreen extends ConsumerStatefulWidget {
   const AddBookScreen({super.key});
 
   @override
-  State<AddBookScreen> createState() => _AddBookScreenState();
+  ConsumerState<AddBookScreen> createState() => _AddBookScreenState();
 }
 
-class _AddBookScreenState extends State<AddBookScreen> {
+class _AddBookScreenState extends ConsumerState<AddBookScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
+  final _authorController = TextEditingController();
+  final _descriptionController = TextEditingController();
   
+  String? _selectedGenre;
+  String? _selectedCondition;
+  String? _selectedStatus;
+  File? _selectedImage;
+  bool _isLoading = false;
+
+  final List<String> _genres = [
+    'Fiction',
+    'Mystery',
+    'Science Fiction',
+    'Romance',
+    'Biography',
+    'History',
+    'Self-Help',
+    'Comic',
+    'Fantasy',
+    'Non-Fiction',
+  ];
+
+  final List<String> _conditions = [
+    'Excellent',
+    'Very Good',
+    'Good',
+    'Fair',
+    'Poor'
+  ];
+
+  final List<String> _statuses = [
+    'Available',
+    'Not Available',
+    'Reserved',
+  ];
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _authorController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 80,
+      );
+      
+      if (image != null) {
+        setState(() {
+          _selectedImage = File(image.path);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to pick image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _submitForm() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final book = await ref.read(booksProvider.notifier).addBook(
+        title: _titleController.text.trim(),
+        author: _authorController.text.trim(),
+        description: _descriptionController.text.trim(),
+        genre: _selectedGenre,
+        bookCondition: _selectedCondition,
+        status: _selectedStatus ?? 'Available',
+        coverImage: _selectedImage,
+      );
+
+      if (mounted) {
+        if (book != null) {
+          // Success
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Book added successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.pop(context);
+          
+          // Refresh the books list
+          ref.read(booksProvider.notifier).loadBooks(refresh: true);
+        } else {
+          // Failed but no exception thrown
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to add book. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
@@ -51,66 +188,175 @@ class _AddBookScreenState extends State<AddBookScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Cover Image Section
+                    const Text(
+                      'Book Cover (Optional)',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    GestureDetector(
+                      onTap: _pickImage,
+                      child: Container(
+                        height: 200,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: _selectedImage != null
+                            ? Stack(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.file(
+                                      _selectedImage!,
+                                      fit: BoxFit.cover,
+                                      width: double.infinity,
+                                      height: double.infinity,
+                                    ),
+                                  ),
+                                  Positioned(
+                                    top: 8,
+                                    right: 8,
+                                    child: IconButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          _selectedImage = null;
+                                        });
+                                      },
+                                      icon: const Icon(Icons.close),
+                                      style: IconButton.styleFrom(
+                                        backgroundColor: Colors.black54,
+                                        foregroundColor: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.add_photo_alternate,
+                                    size: 48,
+                                    color: Colors.grey[400],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Tap to add book cover',
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Title Field
                     _buildFormField(
                       label: 'Title',
                       hint: 'Enter book title',
+                      controller: _titleController,
                       required: true,
                     ),
                     const SizedBox(height: 16),
+
+                    // Author Field
                     _buildFormField(
                       label: 'Author',
                       hint: 'Enter author name',
+                      controller: _authorController,
                       required: true,
                     ),
                     const SizedBox(height: 16),
+
+                    // Description Field
                     _buildFormField(
                       label: 'Description',
                       hint: 'Enter a brief description of the book',
+                      controller: _descriptionController,
                       maxLines: 3,
+                      required: true,
                     ),
                     const SizedBox(height: 16),
+
+                    // Genre Dropdown
                     _buildDropdownField(
                       label: 'Genre',
                       hint: 'Select genre',
-                      required: true,
-                      items: ['Fiction', 'Non-fiction', 'Mystery', 'Romance', 'Science Fiction'],
+                      value: _selectedGenre,
+                      items: _genres,
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedGenre = value;
+                        });
+                      },
                     ),
                     const SizedBox(height: 16),
+
+                    // Condition Dropdown
                     _buildDropdownField(
                       label: 'Condition',
                       hint: 'Select condition',
+                      value: _selectedCondition,
+                      items: _conditions,
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedCondition = value;
+                        });
+                      },
                       required: true,
-                      items: ['New', 'Like New', 'Good', 'Fair', 'Poor'],
                     ),
                     const SizedBox(height: 16),
+
+                    // Status Dropdown
                     _buildDropdownField(
-                      label: 'Trade Status',
-                      hint: 'Select trade status',
+                      label: 'Availability Status',
+                      hint: 'Select availability status',
+                      value: _selectedStatus,
+                      items: _statuses,
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedStatus = value;
+                        });
+                      },
                       required: true,
-                      items: ['Available', 'Not Available', 'In Trade'],
                     ),
                     const SizedBox(height: 32),
+
+                    // Action Buttons
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         TextButton(
-                          onPressed: () => Navigator.pop(context),
+                          onPressed: _isLoading ? null : () => Navigator.pop(context),
                           child: const Text('Cancel'),
                         ),
                         const SizedBox(width: 16),
                         ElevatedButton(
-                          onPressed: () {
-                            if (_formKey.currentState!.validate()) {
-                              // TODO: Implement book addition logic
-                              Navigator.pop(context);
-                            }
-                          },
+                          onPressed: _isLoading ? null : _submitForm,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Theme.of(context).primaryColor,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                           ),
-                          child: const Text('ADD BOOK'),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                              : const Text('ADD BOOK'),
                         ),
                       ],
                     ),
@@ -127,6 +373,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
   Widget _buildFormField({
     required String label,
     required String hint,
+    required TextEditingController controller,
     bool required = false,
     int maxLines = 1,
   }) {
@@ -144,7 +391,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
             ),
             if (required)
               Text(
-                '*',
+                ' *',
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.error,
                   fontSize: 16,
@@ -154,6 +401,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
         ),
         const SizedBox(height: 8),
         TextFormField(
+          controller: controller,
           maxLines: maxLines,
           decoration: InputDecoration(
             hintText: hint,
@@ -164,7 +412,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
           ),
           validator: required
               ? (value) {
-                  if (value == null || value.isEmpty) {
+                  if (value == null || value.trim().isEmpty) {
                     return 'This field is required';
                   }
                   return null;
@@ -178,8 +426,10 @@ class _AddBookScreenState extends State<AddBookScreen> {
   Widget _buildDropdownField({
     required String label,
     required String hint,
-    required bool required,
+    required String? value,
     required List<String> items,
+    required Function(String?) onChanged,
+    bool required = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -195,7 +445,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
             ),
             if (required)
               Text(
-                '*',
+                ' *',
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.error,
                   fontSize: 16,
@@ -205,6 +455,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
+          value: value,
           decoration: InputDecoration(
             hintText: hint,
             border: OutlineInputBorder(
@@ -212,13 +463,13 @@ class _AddBookScreenState extends State<AddBookScreen> {
             ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           ),
-          items: items.map((String value) {
+          items: items.map((item) {
             return DropdownMenuItem<String>(
-              value: value,
-              child: Text(value),
+              value: item,
+              child: Text(item),
             );
           }).toList(),
-          onChanged: (_) {},
+          onChanged: onChanged,
           validator: required
               ? (value) {
                   if (value == null || value.isEmpty) {

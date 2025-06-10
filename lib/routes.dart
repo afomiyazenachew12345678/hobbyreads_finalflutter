@@ -37,8 +37,8 @@ class AppRouter {
         final args = settings.arguments as Map<String, dynamic>;
         return MaterialPageRoute(
           builder: (_) => BookDetailScreen(
-            title: args['title'],
-            author: args['author'],
+            bookId: args['bookId'] as int,
+            book: args['book'],
           ),
         );
       

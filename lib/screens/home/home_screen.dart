@@ -1,11 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hobby_reads_flutter/screens/shared/app_scaffold.dart';
+import 'package:hobby_reads_flutter/providers/auth_providers.dart';
+import 'package:hobby_reads_flutter/providers/book_providers.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Load books when screen initializes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(booksProvider.notifier).loadBooks(refresh: true);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final user = ref.watch(userProvider);
+    final booksState = ref.watch(booksProvider);
+
     return AppScaffold(
       title: 'Dashboard',
       currentRoute: '/home',
@@ -18,9 +38,9 @@ class HomeScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Welcome back, janedoe!',
-                    style: TextStyle(
+                  Text(
+                    'Welcome back, ${user?.name ?? 'Reader'}!',
+                    style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                     ),
@@ -35,21 +55,34 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
                   
-                  // My Books Card
+                  // All Books Card
                   _DashboardCard(
-                    title: 'My Books',
-                    count: '12',
-                    subtitle: 'available for trade',
+                    title: 'Available Books',
+                    count: booksState.books.length.toString(),
+                    subtitle: 'books in the community',
                     icon: Icons.menu_book,
                     onActionPressed: () => Navigator.pushNamed(context, '/books'),
                     actionLabel: 'View All',
+                    isLoading: booksState.isLoading,
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Recommended Books Card (showing available books count for now)
+                  _DashboardCard(
+                    title: 'Recommended',
+                    count: booksState.books.isEmpty ? '0' : '${(booksState.books.length * 0.3).round()}',
+                    subtitle: 'books for you',
+                    icon: Icons.recommend,
+                    onActionPressed: () => Navigator.pushNamed(context, '/books'),
+                    actionLabel: 'Explore',
+                    isLoading: booksState.isLoading,
                   ),
                   const SizedBox(height: 16),
                   
                   // Connections Card
                   _DashboardCard(
                     title: 'Connections',
-                    count: '8',
+                    count: '0',
                     icon: Icons.people_outline,
                     onActionPressed: () => Navigator.pushNamed(context, '/connections'),
                     actionLabel: 'View All',
@@ -59,8 +92,8 @@ class HomeScreen extends StatelessWidget {
                   // Trade Requests Card
                   _DashboardCard(
                     title: 'Trade Requests',
-                    count: '3',
-                    subtitle: 'available for trade',
+                    count: '0',
+                    subtitle: 'pending requests',
                     icon: Icons.swap_horiz_outlined,
                     onActionPressed: () => Navigator.pushNamed(context, '/trades'),
                     actionLabel: 'Respond',
@@ -82,6 +115,7 @@ class _DashboardCard extends StatelessWidget {
   final IconData icon;
   final VoidCallback onActionPressed;
   final String actionLabel;
+  final bool isLoading;
 
   const _DashboardCard({
     required this.title,
@@ -90,6 +124,7 @@ class _DashboardCard extends StatelessWidget {
     required this.icon,
     required this.onActionPressed,
     required this.actionLabel,
+    this.isLoading = false,
   });
 
   @override
@@ -122,13 +157,18 @@ class _DashboardCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Text(
-            count,
-            style: const TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          isLoading
+              ? const SizedBox(
+                  height: 32,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(
+                  count,
+                  style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
           if (subtitle != null) ...[
             const SizedBox(height: 4),
             Text(
