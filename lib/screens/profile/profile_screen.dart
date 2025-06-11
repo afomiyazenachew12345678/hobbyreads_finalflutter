@@ -19,6 +19,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   List<String> selectedHobbies = [];
   File? _selectedImage;
   bool _isLoading = false;
+  bool _isEditingProfile = false;
 
   final List<String> availableHobbies = [
     'Fiction',
@@ -108,6 +109,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       await Future.delayed(const Duration(seconds: 1)); // Simulate API call
       
       _showSuccessSnackBar('Profile updated successfully!');
+      setState(() {
+        _isEditingProfile = false; // Close edit section after saving
+      });
     } catch (e) {
       _showErrorSnackBar('Failed to update profile: $e');
     } finally {
@@ -175,8 +179,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         _loadUserData();
       }
     });
-
-
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -260,14 +262,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   // Profile Picture
                                   Stack(
                                     children: [
-                                                                             CircleAvatar(
-                                         radius: 50,
-                                         backgroundColor: Theme.of(context).primaryColor.withOpacity(0.2),
-                                         backgroundImage: _selectedImage != null 
-                                             ? FileImage(_selectedImage!) as ImageProvider
-                                             : user.profilePicture != null && user.profilePicture!.isNotEmpty
-                                                 ? NetworkImage(user.profilePicture!) as ImageProvider
-                                                 : null,
+                                      CircleAvatar(
+                                        radius: 50,
+                                        backgroundColor: Theme.of(context).primaryColor.withOpacity(0.2),
+                                        backgroundImage: _selectedImage != null 
+                                            ? FileImage(_selectedImage!) as ImageProvider
+                                            : user.profilePicture != null && user.profilePicture!.isNotEmpty
+                                                ? NetworkImage(user.profilePicture!) as ImageProvider
+                                                : null,
                                         child: _selectedImage == null && (user.profilePicture == null || user.profilePicture!.isEmpty)
                                             ? Text(
                                                 user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
@@ -355,6 +357,31 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                         );
                                       }).toList(),
                                     ),
+                                  const SizedBox(height: 20),
+                                  
+                                  // Edit Profile Button
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: OutlinedButton.icon(
+                                      onPressed: () {
+                                        setState(() {
+                                          _isEditingProfile = !_isEditingProfile;
+                                        });
+                                      },
+                                      icon: Icon(_isEditingProfile ? Icons.keyboard_arrow_up : Icons.edit),
+                                      label: Text(_isEditingProfile ? 'Cancel Edit' : 'Edit Profile'),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: Theme.of(context).primaryColor,
+                                        side: BorderSide(
+                                          color: Theme.of(context).primaryColor,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -362,257 +389,283 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         ),
                       ),
                       
-                      const SizedBox(height: 16),
-                      
-                      // Edit Profile Section
-                      Container(
-                        margin: const EdgeInsets.all(16),
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 2),
+                      // Always visible logout button when not editing
+                      if (!_isEditingProfile) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 16),
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: _logout,
+                            icon: const Icon(Icons.logout),
+                            label: const Text('Logout'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.red,
+                              side: const BorderSide(color: Colors.red),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
-                          ],
+                          ),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Edit Profile',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                        const SizedBox(height: 16),
+                      ],
+                      
+                      // Edit Profile Section (Only shown when _isEditingProfile is true)
+                      if (_isEditingProfile) ...[
+                        const SizedBox(height: 16),
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                          margin: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                                offset: const Offset(0, 2),
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Update your profile information',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Edit Profile',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 24),
-                            
-                            // Name Field
-                            _buildTextField(
-                              label: 'Name',
-                              controller: _nameController,
-                              icon: Icons.person_outline,
-                            ),
-                            const SizedBox(height: 20),
-                            
-                            // Username Field (read-only)
-                            _buildTextField(
-                              label: 'Username',
-                              controller: _usernameController,
-                              icon: Icons.alternate_email,
-                              readOnly: true,
-                              hint: 'Username cannot be changed',
-                            ),
-                            const SizedBox(height: 20),
-                            
-                            // Bio Field
-                            _buildTextField(
-                              label: 'Bio',
-                              controller: _bioController,
-                              icon: Icons.edit_note,
-                              maxLines: 3,
-                              hint: 'Tell others about yourself...',
-                            ),
-                            const SizedBox(height: 24),
-                            
-                            // Hobbies Section
-                            const Text(
-                              'Hobbies',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
+                              const SizedBox(height: 8),
+                              Text(
+                                'Update your profile information',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 12),
-                            
-                            // Selected Hobbies
-                            if (selectedHobbies.isNotEmpty) ...[
+                              const SizedBox(height: 24),
+                              
+                              // Name Field
+                              _buildTextField(
+                                label: 'Name',
+                                controller: _nameController,
+                                icon: Icons.person_outline,
+                              ),
+                              const SizedBox(height: 20),
+                              
+                              // Username Field (read-only)
+                              _buildTextField(
+                                label: 'Username',
+                                controller: _usernameController,
+                                icon: Icons.alternate_email,
+                                readOnly: true,
+                                hint: 'Username cannot be changed',
+                              ),
+                              const SizedBox(height: 20),
+                              
+                              // Bio Field
+                              _buildTextField(
+                                label: 'Bio',
+                                controller: _bioController,
+                                icon: Icons.edit_note,
+                                maxLines: 3,
+                                hint: 'Tell others about yourself...',
+                              ),
+                              const SizedBox(height: 24),
+                              
+                              // Hobbies Section
+                              const Text(
+                                'Hobbies',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              
+                              // Selected Hobbies
+                              if (selectedHobbies.isNotEmpty) ...[
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: selectedHobbies.map((hobby) {
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 8,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context).primaryColor.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                          color: Theme.of(context).primaryColor.withOpacity(0.3),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            hobby,
+                                            style: TextStyle(
+                                              color: Theme.of(context).primaryColor,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          GestureDetector(
+                                            onTap: () {
+                                              setState(() {
+                                                selectedHobbies.remove(hobby);
+                                              });
+                                            },
+                                            child: Icon(
+                                              Icons.close,
+                                              size: 16,
+                                              color: Theme.of(context).primaryColor,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+                              
+                              // Available Hobbies
+                              Text(
+                                'Add hobbies:',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
                               Wrap(
                                 spacing: 8,
                                 runSpacing: 8,
-                                children: selectedHobbies.map((hobby) {
-                                  return Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 8,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context).primaryColor.withOpacity(0.1),
+                                children: availableHobbies
+                                    .where((hobby) => !selectedHobbies.contains(hobby))
+                                    .map((hobby) {
+                                  return FilterChip(
+                                    label: Text(hobby),
+                                    selected: false,
+                                    onSelected: (bool selected) {
+                                      if (selected) {
+                                        setState(() {
+                                          selectedHobbies.add(hobby);
+                                        });
+                                      }
+                                    },
+                                    backgroundColor: Colors.grey[50],
+                                    selectedColor: Theme.of(context).primaryColor.withOpacity(0.2),
+                                    checkmarkColor: Theme.of(context).primaryColor,
+                                    shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(
-                                        color: Theme.of(context).primaryColor.withOpacity(0.3),
+                                      side: BorderSide(
+                                        color: Colors.grey[300]!,
                                       ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          hobby,
-                                          style: TextStyle(
-                                            color: Theme.of(context).primaryColor,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        GestureDetector(
-                                          onTap: () {
-                                            setState(() {
-                                              selectedHobbies.remove(hobby);
-                                            });
-                                          },
-                                          child: Icon(
-                                            Icons.close,
-                                            size: 16,
-                                            color: Theme.of(context).primaryColor,
-                                          ),
-                                        ),
-                                      ],
                                     ),
                                   );
                                 }).toList(),
                               ),
-                              const SizedBox(height: 16),
-                            ],
-                            
-                            // Available Hobbies
-                            Text(
-                              'Add hobbies:',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
+                              const SizedBox(height: 24),
+                              
+                              // Profile Picture Section
+                              const Text(
+                                'Profile Picture',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: availableHobbies
-                                  .where((hobby) => !selectedHobbies.contains(hobby))
-                                  .map((hobby) {
-                                return FilterChip(
-                                  label: Text(hobby),
-                                  selected: false,
-                                  onSelected: (bool selected) {
-                                    if (selected) {
-                                      setState(() {
-                                        selectedHobbies.add(hobby);
-                                      });
-                                    }
-                                  },
-                                  backgroundColor: Colors.grey[50],
-                                  selectedColor: Theme.of(context).primaryColor.withOpacity(0.2),
-                                  checkmarkColor: Theme.of(context).primaryColor,
+                              const SizedBox(height: 12),
+                              OutlinedButton.icon(
+                                onPressed: _pickImage,
+                                icon: const Icon(Icons.camera_alt),
+                                label: Text(_selectedImage != null ? 'Change Image' : 'Select Image'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Theme.of(context).primaryColor,
+                                  side: BorderSide(
+                                    color: Theme.of(context).primaryColor,
+                                  ),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(20),
-                                    side: BorderSide(
-                                      color: Colors.grey[300]!,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Optional. Maximum file size: 5MB',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              const SizedBox(height: 32),
+                              
+                              // Save Button
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: _isLoading ? null : _saveProfile,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Theme.of(context).primaryColor,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                  child: _isLoading
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                          ),
+                                        )
+                                      : const Text(
+                                          'Save Changes',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              
+                              // Logout Button (when editing)
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: _logout,
+                                  icon: const Icon(Icons.logout),
+                                  label: const Text('Logout'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.red,
+                                    side: const BorderSide(color: Colors.red),
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
                                   ),
-                                );
-                              }).toList(),
-                            ),
-                            const SizedBox(height: 24),
-                            
-                            // Profile Picture Section
-                            const Text(
-                              'Profile Picture',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            OutlinedButton.icon(
-                              onPressed: _pickImage,
-                              icon: const Icon(Icons.camera_alt),
-                              label: Text(_selectedImage != null ? 'Change Image' : 'Select Image'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Theme.of(context).primaryColor,
-                                side: BorderSide(
-                                  color: Theme.of(context).primaryColor,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Optional. Maximum file size: 5MB',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            const SizedBox(height: 32),
-                            
-                            // Save Button
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: _isLoading ? null : _saveProfile,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Theme.of(context).primaryColor,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  elevation: 0,
-                                ),
-                                child: _isLoading
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                        ),
-                                      )
-                                    : const Text(
-                                        'Save Changes',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            
-                            // Logout Button
-                            SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton.icon(
-                                onPressed: _logout,
-                                icon: const Icon(Icons.logout),
-                                label: const Text('Logout'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.red,
-                                  side: const BorderSide(color: Colors.red),
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
