@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hobby_reads_flutter/providers/auth_providers.dart';
 
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
-  final _nameController = TextEditingController(text: 'tester');
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  late TextEditingController _nameController;
   final _bioController = TextEditingController();
   final List<String> selectedHobbies = ['Romance', 'psycholoy', 'Non-fiction'];
   final List<String> availableHobbies = [
@@ -22,6 +24,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    final user = ref.read(userProvider);
+    _nameController = TextEditingController(text: user?.name ?? '');
+    _bioController.text = user?.bio ?? '';
+  }
+
+  @override
   void dispose() {
     _nameController.dispose();
     _bioController.dispose();
@@ -30,6 +40,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final user = ref.watch(userProvider);
+    
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -105,9 +117,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       CircleAvatar(
                         radius: 40,
                         backgroundColor: Colors.grey[300],
-                        child: const Text(
-                          't',
-                          style: TextStyle(
+                        child: Text(
+                          user?.name?.isNotEmpty == true ? user!.name![0].toUpperCase() : '?',
+                          style: const TextStyle(
                             fontSize: 32,
                             color: Colors.black54,
                           ),
@@ -127,16 +139,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: const Text('Change Profile Picture'),
                       ),
                       const SizedBox(height: 16),
-                      const Text(
-                        'tester',
-                        style: TextStyle(
+                      Text(
+                        user?.name ?? 'User',
+                        style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const Text(
-                        '@test',
-                        style: TextStyle(
+                      Text(
+                        '@${user?.username ?? 'user'}',
+                        style: const TextStyle(
                           fontSize: 16,
                           color: Colors.grey,
                         ),
