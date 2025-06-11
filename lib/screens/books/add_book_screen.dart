@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:hobby_reads_flutter/screens/shared/app_scaffold.dart';
 import 'package:hobby_reads_flutter/providers/book_providers.dart';
+import 'package:hobby_reads_flutter/data/model/book_model.dart';
 
 class AddBookScreen extends ConsumerStatefulWidget {
   const AddBookScreen({super.key});
@@ -46,9 +47,9 @@ class _AddBookScreenState extends ConsumerState<AddBookScreen> {
   ];
 
   final List<String> _statuses = [
-    'Available',
-    'Not Available',
-    'Reserved',
+    BookModel.statusAvailableForTrade,
+    BookModel.statusNotAvailableForTrade,
+    BookModel.statusReserved,
   ];
 
   @override
@@ -102,7 +103,7 @@ class _AddBookScreenState extends ConsumerState<AddBookScreen> {
         description: _descriptionController.text.trim(),
         genre: _selectedGenre,
         bookCondition: _selectedCondition,
-        status: _selectedStatus ?? 'Available',
+        status: _selectedStatus ?? BookModel.statusAvailableForTrade,
         coverImage: _selectedImage,
       );
 

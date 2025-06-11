@@ -1,5 +1,3 @@
-
-
 enum TradeStatus {
   pending,
   accepted,
@@ -133,6 +131,39 @@ class TradeRequestModel {
           : null,
       receiverProfile: json['receiverProfile'] != null
           ? UserProfile.fromJson(json['receiverProfile'] as Map<String, dynamic>)
+          : null,
+    );
+  }
+
+  // Create model from backend JSON format
+  factory TradeRequestModel.fromBackendJson(Map<String, dynamic> json) {
+    // Backend uses different field names: requesterId, ownerId, bookId
+    return TradeRequestModel(
+      id: json['id'].toString(),
+      senderId: json['requesterId'].toString(),
+      receiverId: json['ownerId'].toString(),
+      senderBookId: json['bookId'].toString(),
+      receiverBookId: json['bookId'].toString(), // Same book for now
+      status: TradeStatus.values.firstWhere(
+        (e) => e.toString().split('.').last == json['status'],
+        orElse: () => TradeStatus.pending,
+      ),
+      message: json['message'] as String?,
+      acceptedAt: null, // Backend doesn't provide this yet
+      completedAt: null, // Backend doesn't provide this yet
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      senderBook: json['book'] != null
+          ? BookDetails.fromBackendJson(json['book'] as Map<String, dynamic>)
+          : null,
+      receiverBook: json['book'] != null
+          ? BookDetails.fromBackendJson(json['book'] as Map<String, dynamic>)
+          : null,
+      senderProfile: json['requester'] != null
+          ? UserProfile.fromBackendJson(json['requester'] as Map<String, dynamic>)
+          : null,
+      receiverProfile: json['owner'] != null
+          ? UserProfile.fromBackendJson(json['owner'] as Map<String, dynamic>)
           : null,
     );
   }
@@ -305,6 +336,19 @@ class BookDetails {
     );
   }
 
+  // Create book details from backend JSON format
+  factory BookDetails.fromBackendJson(Map<String, dynamic> json) {
+    return BookDetails(
+      id: json['id'].toString(),
+      title: json['title'] as String,
+      author: json['author'] as String,
+      coverImage: json['coverImageUrl'] as String?,
+      description: null, // Backend doesn't provide description in trade response
+      rating: 0.0, // Backend doesn't provide rating in trade response
+      genres: [], // Backend doesn't provide genres in trade response
+    );
+  }
+
   @override
   String toString() {
     return 'BookDetails(id: $id, title: $title, author: $author, coverImage: $coverImage, description: $description, rating: $rating, genres: $genres)';
@@ -394,6 +438,18 @@ class UserProfile {
       profilePicture: json['profilePicture'] as String?,
       bio: json['bio'] as String?,
       hobbies: List<String>.from(json['hobbies'] as List),
+    );
+  }
+
+  // Create profile from backend JSON format
+  factory UserProfile.fromBackendJson(Map<String, dynamic> json) {
+    return UserProfile(
+      id: json['id'].toString(),
+      name: json['name'] as String,
+      handle: json['username'] as String?, // Backend uses 'username' field
+      profilePicture: null, // Backend doesn't provide profile picture in trade response
+      bio: null, // Backend doesn't provide bio in trade response  
+      hobbies: [], // Backend doesn't provide hobbies in trade response
     );
   }
 

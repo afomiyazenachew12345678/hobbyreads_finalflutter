@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hobby_reads_flutter/screens/shared/app_scaffold.dart';
 import 'package:hobby_reads_flutter/providers/auth_providers.dart';
 import 'package:hobby_reads_flutter/providers/book_providers.dart';
+import 'package:hobby_reads_flutter/providers/connection_providers.dart';
+import 'package:hobby_reads_flutter/providers/trade_providers.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -15,93 +17,119 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Load books when screen initializes
+    // Load data when screen initializes
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(booksProvider.notifier).loadBooks(refresh: true);
+      // Load connections if user is authenticated
+      if (ref.read(isAuthenticatedProvider)) {
+        ref.read(myConnectionsProvider.notifier).loadConnections();
+        ref.read(pendingTradeRequestsProvider.notifier).loadPendingRequests();
+      }
     });
+  }
+
+  // Refresh data when screen comes back into focus
+  void _refreshData() {
+    ref.read(booksProvider.notifier).loadBooks(refresh: true);
+    if (ref.read(isAuthenticatedProvider)) {
+      ref.read(myConnectionsProvider.notifier).loadConnections();
+      ref.read(pendingTradeRequestsProvider.notifier).loadPendingRequests();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(userProvider);
     final booksState = ref.watch(booksProvider);
+    final connectionsCount = ref.watch(connectionsCountProvider);
+    final connectionsState = ref.watch(myConnectionsProvider);
+    final pendingTradeRequestsCount = ref.watch(incomingTradeRequestsCountProvider);
+    final tradeRequestsState = ref.watch(pendingTradeRequestsProvider);
 
     return AppScaffold(
       title: 'Dashboard',
       currentRoute: '/home',
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Welcome back, ${user?.name ?? 'Reader'}!',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+      body: RefreshIndicator(
+        onRefresh: () async => _refreshData(),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Welcome back, ${user?.name ?? 'Reader'}!',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Here\'s what\'s happening with your reading community.',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
+                    const SizedBox(height: 4),
+                    Text(
+                      'Here\'s what\'s happening with your reading community.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // All Books Card
-                  _DashboardCard(
-                    title: 'Available Books',
-                    count: booksState.books.length.toString(),
-                    subtitle: 'books in the community',
-                    icon: Icons.menu_book,
-                    onActionPressed: () => Navigator.pushNamed(context, '/books'),
-                    actionLabel: 'View All',
-                    isLoading: booksState.isLoading,
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Recommended Books Card (showing available books count for now)
-                  _DashboardCard(
-                    title: 'Recommended',
-                    count: booksState.books.isEmpty ? '0' : '${(booksState.books.length * 0.3).round()}',
-                    subtitle: 'books for you',
-                    icon: Icons.recommend,
-                    onActionPressed: () => Navigator.pushNamed(context, '/books'),
-                    actionLabel: 'Explore',
-                    isLoading: booksState.isLoading,
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Connections Card
-                  _DashboardCard(
-                    title: 'Connections',
-                    count: '0',
-                    icon: Icons.people_outline,
-                    onActionPressed: () => Navigator.pushNamed(context, '/connections'),
-                    actionLabel: 'View All',
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Trade Requests Card
-                  _DashboardCard(
-                    title: 'Trade Requests',
-                    count: '0',
-                    subtitle: 'pending requests',
-                    icon: Icons.swap_horiz_outlined,
-                    onActionPressed: () => Navigator.pushNamed(context, '/trades'),
-                    actionLabel: 'Respond',
-                  ),
-                ],
+                    const SizedBox(height: 24),
+                    
+                    // All Books Card
+                    _DashboardCard(
+                      title: 'Available Books',
+                      count: booksState.books.length.toString(),
+                      subtitle: 'books in the community',
+                      icon: Icons.menu_book,
+                      onActionPressed: () => Navigator.pushNamed(context, '/books'),
+                      actionLabel: 'View All',
+                      isLoading: booksState.isLoading,
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Recommended Books Card (showing available books count for now)
+                    _DashboardCard(
+                      title: 'Recommended',
+                      count: booksState.books.isEmpty ? '0' : '${(booksState.books.length * 0.3).round()}',
+                      subtitle: 'books for you',
+                      icon: Icons.recommend,
+                      onActionPressed: () => Navigator.pushNamed(context, '/books'),
+                      actionLabel: 'Explore',
+                      isLoading: booksState.isLoading,
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Connections Card
+                    _DashboardCard(
+                      title: 'Connections',
+                      count: connectionsState.error != null ? '0' : connectionsCount.toString(),
+                      icon: Icons.people_outline,
+                      onActionPressed: () => Navigator.pushNamed(context, '/connections'),
+                      actionLabel: 'View All',
+                      isLoading: connectionsState.isLoading,
+                      error: connectionsState.error,
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Trade Requests Card
+                    _DashboardCard(
+                      title: 'Trade Requests',
+                      count: tradeRequestsState.error != null ? '0' : pendingTradeRequestsCount.toString(),
+                      subtitle: 'pending requests',
+                      icon: Icons.swap_horiz_outlined,
+                      onActionPressed: () => Navigator.pushNamed(context, '/trades'),
+                      actionLabel: 'Respond',
+                      isLoading: tradeRequestsState.isLoading,
+                      error: tradeRequestsState.error,
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -116,6 +144,7 @@ class _DashboardCard extends StatelessWidget {
   final VoidCallback onActionPressed;
   final String actionLabel;
   final bool isLoading;
+  final String? error;
 
   const _DashboardCard({
     required this.title,
@@ -125,6 +154,7 @@ class _DashboardCard extends StatelessWidget {
     required this.onActionPressed,
     required this.actionLabel,
     this.isLoading = false,
+    this.error,
   });
 
   @override
@@ -152,7 +182,7 @@ class _DashboardCard extends StatelessWidget {
               Icon(
                 icon,
                 size: 24,
-                color: Theme.of(context).primaryColor,
+                color: error != null ? Colors.red : Theme.of(context).primaryColor,
               ),
             ],
           ),
@@ -164,18 +194,29 @@ class _DashboardCard extends StatelessWidget {
                 )
               : Text(
                   count,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
+                    color: error != null ? Colors.red : null,
                   ),
                 ),
-          if (subtitle != null) ...[
+          if (subtitle != null && error == null) ...[
             const SizedBox(height: 4),
             Text(
               subtitle!,
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey[600],
+              ),
+            ),
+          ],
+          if (error != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Error loading data',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.red[600],
               ),
             ),
           ],

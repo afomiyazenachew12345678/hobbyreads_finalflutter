@@ -8,6 +8,7 @@ router.post("/", verifyToken, trades.createTradeRequest);
 router.put("/:id", verifyToken, trades.updateTradeRequestStatus);
 
 router.get("/pending", verifyToken, trades.getPendingTradeRequests);
+router.get("/accepted", verifyToken, trades.getCurrentUserAcceptedTrades);
 router.get("/user/:id", trades.getAcceptedTradeRequests);
 
 module.exports = router;

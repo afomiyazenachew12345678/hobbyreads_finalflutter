@@ -380,3 +380,70 @@ exports.getAcceptedTradeRequests = async (req, res) => {
     });
   }
 };
+
+// Get current user's accepted trade requests
+exports.getCurrentUserAcceptedTrades = async (req, res) => {
+  try {
+    const userId = req.userId; // From auth middleware
+    const pool = global.db;
+    
+    const [tradeRequests] = await pool.query(
+      `SELECT 
+      tr.id, tr.requesterId, tr.bookId, tr.ownerId, tr.status, tr.message, tr.createdAt, tr.updatedAt,
+      b.title as bookTitle, b.author as bookAuthor, b.coverImage as bookCoverUrl,
+      requester.username as requesterUsername, requester.name as requesterName,
+      owner.username as ownerUsername, owner.name as ownerName
+      FROM trade_requests tr
+      JOIN books b ON tr.bookId = b.id
+      JOIN users requester ON tr.requesterId = requester.id
+      JOIN users owner ON tr.ownerId = owner.id
+      WHERE (tr.requesterId = ? OR tr.ownerId = ?) AND tr.status = 'accepted'
+      ORDER BY tr.createdAt DESC`,
+      [userId, userId]
+    );
+
+    const formattedRequests = tradeRequests.map((request) => {
+      const isIncoming = request.ownerId === userId;
+
+      return {
+        id: request.id,
+        requesterId: request.requesterId,
+        bookId: request.bookId,
+        ownerId: request.ownerId,
+        status: request.status,
+        message: request.message,
+        createdAt: request.createdAt,
+        updatedAt: request.updatedAt,
+        book: {
+          id: request.bookId,
+          title: request.bookTitle,
+          author: request.bookAuthor,
+          coverImageUrl: request.bookCoverUrl
+            ? `${req.protocol}://${req.get("host")}/uploads/books/${
+                request.bookCoverUrl
+              }`
+            : null
+        },
+        requester: {
+          id: request.requesterId,
+          username: request.requesterUsername,
+          name: request.requesterName
+        },
+        owner: {
+          id: request.ownerId,
+          username: request.ownerUsername,
+          name: request.ownerName
+        },
+        type: isIncoming ? "INCOMING" : "OUTGOING"
+      };
+    });
+
+    res.status(200).send(formattedRequests);
+  } catch (err) {
+    res.status(500).send({
+      message:
+        err.message ||
+        "Some error occurred while retrieving accepted trade requests."
+    });
+  }
+};

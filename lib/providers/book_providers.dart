@@ -136,7 +136,7 @@ class BooksNotifier extends StateNotifier<BooksState> {
     required String description,
     String? genre,
     String? bookCondition,
-    String status = 'Available',
+    String status = BookModel.statusAvailableForTrade,
     File? coverImage,
   }) async {
     try {
