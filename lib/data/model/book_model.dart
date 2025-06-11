@@ -1,4 +1,10 @@
 class BookModel {
+  // Book status constants
+  static const String statusAvailableForTrade = 'Available for Trade';
+  static const String statusNotAvailableForTrade = 'Not Available for Trade';
+  static const String statusReserved = 'Reserved';
+  static const String statusTraded = 'Traded';
+
   final int? id;
   final String title;
   final String author;

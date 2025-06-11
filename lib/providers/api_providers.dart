@@ -6,6 +6,7 @@ import 'package:hobby_reads_flutter/data/repository/book_repository.dart';
 import 'package:hobby_reads_flutter/data/repository/connection_repository.dart';
 import 'package:hobby_reads_flutter/data/repository/token_manager_repository.dart';
 import 'package:hobby_reads_flutter/data/repository/user_repository.dart';
+import 'package:hobby_reads_flutter/data/repository/trade_repository.dart';
 
 // SharedPreferences provider
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
@@ -48,4 +49,9 @@ final userRepositoryProvider = Provider<UserRepository>((ref) {
   final apiService = ref.watch(apiServiceProvider);
   final tokenManager = ref.watch(tokenManagerProvider);
   return UserRepository(apiService, tokenManager);
+});
+
+final tradeRepositoryProvider = Provider<TradeRepository>((ref) {
+  final apiService = ref.watch(apiServiceProvider);
+  return TradeRepository(apiService);
 }); 

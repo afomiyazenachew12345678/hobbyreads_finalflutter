@@ -4,6 +4,7 @@ import 'package:hobby_reads_flutter/screens/shared/app_scaffold.dart';
 import 'package:hobby_reads_flutter/providers/auth_providers.dart';
 import 'package:hobby_reads_flutter/providers/book_providers.dart';
 import 'package:hobby_reads_flutter/providers/connection_providers.dart';
+import 'package:hobby_reads_flutter/providers/trade_providers.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -22,6 +23,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       // Load connections if user is authenticated
       if (ref.read(isAuthenticatedProvider)) {
         ref.read(myConnectionsProvider.notifier).loadConnections();
+        ref.read(pendingTradeRequestsProvider.notifier).loadPendingRequests();
       }
     });
   }
@@ -31,6 +33,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ref.read(booksProvider.notifier).loadBooks(refresh: true);
     if (ref.read(isAuthenticatedProvider)) {
       ref.read(myConnectionsProvider.notifier).loadConnections();
+      ref.read(pendingTradeRequestsProvider.notifier).loadPendingRequests();
     }
   }
 
@@ -40,6 +43,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final booksState = ref.watch(booksProvider);
     final connectionsCount = ref.watch(connectionsCountProvider);
     final connectionsState = ref.watch(myConnectionsProvider);
+    final pendingTradeRequestsCount = ref.watch(incomingTradeRequestsCountProvider);
+    final tradeRequestsState = ref.watch(pendingTradeRequestsProvider);
 
     return AppScaffold(
       title: 'Dashboard',
@@ -112,11 +117,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     // Trade Requests Card
                     _DashboardCard(
                       title: 'Trade Requests',
-                      count: '0',
+                      count: tradeRequestsState.error != null ? '0' : pendingTradeRequestsCount.toString(),
                       subtitle: 'pending requests',
                       icon: Icons.swap_horiz_outlined,
                       onActionPressed: () => Navigator.pushNamed(context, '/trades'),
                       actionLabel: 'Respond',
+                      isLoading: tradeRequestsState.isLoading,
+                      error: tradeRequestsState.error,
                     ),
                   ],
                 ),

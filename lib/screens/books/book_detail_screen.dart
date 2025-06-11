@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hobby_reads_flutter/data/model/book_model.dart';
-import 'package:hobby_reads_flutter/providers/book_providers.dart';
 import 'package:hobby_reads_flutter/providers/auth_providers.dart';
+import 'package:hobby_reads_flutter/providers/book_providers.dart';
+import 'package:hobby_reads_flutter/providers/trade_providers.dart';
 import 'package:hobby_reads_flutter/screens/shared/app_scaffold.dart';
+import 'package:hobby_reads_flutter/data/model/review_model.dart';
 
 class BookDetailScreen extends ConsumerStatefulWidget {
   final int bookId;
@@ -102,6 +104,22 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
     final reviewsState = ref.watch(reviewsProvider(widget.bookId));
     final user = ref.watch(userProvider);
 
+    // Listen to trade request state changes
+    ref.listen<TradeRequestsState>(pendingTradeRequestsProvider, (previous, next) {
+      if (next.successMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(next.successMessage!), backgroundColor: Colors.green),
+        );
+        ref.read(pendingTradeRequestsProvider.notifier).clearMessages();
+      }
+      if (next.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(next.error!), backgroundColor: Colors.red),
+        );
+        ref.read(pendingTradeRequestsProvider.notifier).clearMessages();
+      }
+    });
+
     return AppScaffold(
       title: 'Book Details',
       currentRoute: '/books/detail',
@@ -125,8 +143,8 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
                       children: [
                         // Book Info Header
                         Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             // Book Cover
                             Container(
                               width: 120,
@@ -150,24 +168,24 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
                             const SizedBox(width: 16),
                             // Book Details
                             Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
                                     book.displayTitle,
-                  style: const TextStyle(
+                                    style: const TextStyle(
                                       fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
                                     'by ${book.displayAuthor}',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[600],
-                  ),
-                ),
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
                                   const SizedBox(height: 8),
                                   if (book.genre != null) ...[
                                     Chip(
@@ -210,54 +228,57 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
                                         ),
                                       ),
                                     ],
-                ),
-              ],
-            ),
-          ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  // Trade Request Button
+                                  _buildTradeRequestButton(context, ref, book, user),
+                                ],
+                              ),
+                            ),
                           ],
-                    ),
-                    const SizedBox(height: 24),
+                        ),
+                        const SizedBox(height: 24),
                         
                         // Description
-                    const Text(
-                      'Description',
-                      style: TextStyle(
+                        const Text(
+                          'Description',
+                          style: TextStyle(
                             fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
                         Text(
                           book.description.isNotEmpty 
                             ? book.description
                             : 'No description available.',
                           style: const TextStyle(fontSize: 14),
-                    ),
+                        ),
                         const SizedBox(height: 24),
                         
                         // Rating Summary
                         if (book.reviews.isNotEmpty) ...[
-                    Row(
-                      children: [
-                        ...List.generate(5, (index) => Icon(
-                          Icons.star,
+                          Row(
+                            children: [
+                              ...List.generate(5, (index) => Icon(
+                                Icons.star,
                                 size: 20,
                                 color: index < book.rating.round() ? Colors.amber : Colors.grey[300],
-                        )),
-                        const SizedBox(width: 8),
-                        Text(
+                              )),
+                              const SizedBox(width: 8),
+                              Text(
                                 '${book.rating.toStringAsFixed(1)} (${book.reviews.length} review${book.reviews.length == 1 ? '' : 's'})',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
                           const SizedBox(height: 24),
                         ],
                         
-                                                // Reviews Section
+                        // Reviews Section
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -305,7 +326,7 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
                               ),
                           ],
                         ),
-                    const SizedBox(height: 16),
+                        const SizedBox(height: 16),
                         
                         // Review Form
                         if (_showReviewForm) ...[
@@ -318,69 +339,69 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                    Text(
-                      'Your rating',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: List.generate(5, (index) => GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _userRating = index + 1;
-                          });
-                        },
-                        child: Icon(
-                          Icons.star,
-                          size: 32,
-                          color: index < _userRating ? Colors.amber : Colors.grey[300],
-                        ),
-                      )),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Your review (optional)',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _reviewController,
-                      maxLines: 3,
-                      decoration: InputDecoration(
-                        hintText: 'Share your thoughts about this book...',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        contentPadding: const EdgeInsets.all(16),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _userRating = 0;
-                              _reviewController.clear();
+                                Text(
+                                  'Your rating',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: List.generate(5, (index) => GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _userRating = index + 1;
+                                      });
+                                    },
+                                    child: Icon(
+                                      Icons.star,
+                                      size: 32,
+                                      color: index < _userRating ? Colors.amber : Colors.grey[300],
+                                    ),
+                                  )),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Your review (optional)',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                TextField(
+                                  controller: _reviewController,
+                                  maxLines: 3,
+                                  decoration: InputDecoration(
+                                    hintText: 'Share your thoughts about this book...',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    contentPadding: const EdgeInsets.all(16),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    TextButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          _userRating = 0;
+                                          _reviewController.clear();
                                           _showReviewForm = false;
-                            });
-                          },
-                          child: const Text('Cancel'),
-                        ),
-                        const SizedBox(width: 16),
-                        ElevatedButton(
+                                        });
+                                      },
+                                      child: const Text('Cancel'),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    ElevatedButton(
                                       onPressed: reviewsState.isSubmitting ? null : _submitReview,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Theme.of(context).primaryColor,
-                            foregroundColor: Colors.white,
-                          ),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Theme.of(context).primaryColor,
+                                        foregroundColor: Colors.white,
+                                      ),
                                       child: reviewsState.isSubmitting
                                           ? const SizedBox(
                                               width: 16,
@@ -457,9 +478,9 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
                                       fontSize: 14,
                                       color: Colors.grey,
                                     ),
-                        ),
-                      ],
-                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           )
                         else
@@ -476,13 +497,13 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
                                 ),
                               )
                             ).toList(),
+                          ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
-        ],
+            ],
           );
         },
         loading: () => const Center(
@@ -541,6 +562,144 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
       ),
     );
   }
+
+  Widget _buildTradeRequestButton(BuildContext context, WidgetRef ref, BookModel book, dynamic user) {
+    // Don't show button if user is not authenticated
+    if (user == null) return const SizedBox.shrink();
+    
+    // Don't show button if this is the user's own book
+    if (book.ownerId != null && book.ownerId.toString() == user.id) {
+      return const SizedBox.shrink();
+    }
+    
+    // Only show for books available for trade
+    if (book.status != BookModel.statusAvailableForTrade) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
+            const SizedBox(width: 4),
+            Text(
+              'Not available for trade',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final tradeState = ref.watch(pendingTradeRequestsProvider);
+    final isCreatingRequest = tradeState.isLoading;
+
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: isCreatingRequest ? null : () => _showTradeRequestDialog(context, ref, book),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Theme.of(context).primaryColor,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+        icon: isCreatingRequest 
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : const Icon(Icons.swap_horiz),
+        label: Text(
+          isCreatingRequest ? 'Sending Request...' : 'Request Trade',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showTradeRequestDialog(BuildContext context, WidgetRef ref, BookModel book) {
+    final messageController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Send Trade Request'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            RichText(
+              text: TextSpan(
+                style: const TextStyle(color: Colors.black, fontSize: 14),
+                children: [
+                  const TextSpan(text: 'Send a trade request for '),
+                  TextSpan(
+                    text: '"${book.displayTitle}"',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  TextSpan(text: ' to ${book.ownerName ?? "the owner"}?'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: messageController,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'Add a message (optional)',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                contentPadding: const EdgeInsets.all(12),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _sendTradeRequest(context, ref, book, messageController.text.trim());
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).primaryColor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Send Request'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _sendTradeRequest(BuildContext context, WidgetRef ref, BookModel book, String message) {
+    if (book.id != null) {
+      ref.read(pendingTradeRequestsProvider.notifier).createTradeRequest(
+        bookId: book.id.toString(),
+        message: message.isNotEmpty ? message : null,
+      );
+    }
+  }
 }
 
 class _ReviewItem extends StatelessWidget {
@@ -570,26 +729,26 @@ class _ReviewItem extends StatelessWidget {
         color: isCurrentUser ? Colors.blue[50] : null,
       ),
       child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: Colors.grey[200],
-              child: Text(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: Colors.grey[200],
+                child: Text(
                   (review.username ?? 'U')[0].toUpperCase(),
-                style: TextStyle(
-                  color: Colors.grey[600],
+                  style: TextStyle(
+                    color: Colors.grey[600],
                     fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                                    Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
                         Text(
                           review.username ?? 'Anonymous',
@@ -619,39 +778,39 @@ class _ReviewItem extends StatelessWidget {
                       ],
                     ),
                     if (review.createdAt != null)
-                Text(
+                      Text(
                         _formatDate(review.createdAt!),
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 12,
-                  ),
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 12,
+                        ),
+                      ),
+                  ],
                 ),
-              ],
-            ),
               ),
               if (isCurrentUser && onDelete != null && review.id != null)
                 IconButton(
                   onPressed: () => _showDeleteConfirmation(context),
                   icon: const Icon(Icons.delete_outline, color: Colors.red),
                   iconSize: 20,
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: List.generate(5, (index) => Icon(
+              Icons.star,
+              size: 16,
+              color: index < review.rating ? Colors.amber : Colors.grey[300],
+            )),
+          ),
+          if (review.comment.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              review.comment,
+              style: const TextStyle(fontSize: 14),
             ),
           ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: List.generate(5, (index) => Icon(
-            Icons.star,
-            size: 16,
-              color: index < review.rating ? Colors.amber : Colors.grey[300],
-          )),
-        ),
-          if (review.comment.isNotEmpty) ...[
-        const SizedBox(height: 8),
-        Text(
-              review.comment,
-          style: const TextStyle(fontSize: 14),
-        ),
-      ],
         ],
       ),
     );

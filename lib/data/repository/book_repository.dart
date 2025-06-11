@@ -104,7 +104,7 @@ class BookRepository {
     required String description,
     String? genre,
     String? bookCondition,
-    String status = 'Available',
+    String status = BookModel.statusAvailableForTrade,
     File? coverImage,
   }) async {
     try {
