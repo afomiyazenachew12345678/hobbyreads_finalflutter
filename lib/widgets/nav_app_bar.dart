@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hobby_reads_flutter/providers/auth_providers.dart';
 
-class NavAppBar extends StatelessWidget implements PreferredSizeWidget {
+class NavAppBar extends ConsumerWidget implements PreferredSizeWidget {
   final String currentRoute;
 
   const NavAppBar({
@@ -9,7 +11,9 @@ class NavAppBar extends StatelessWidget implements PreferredSizeWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(userProvider);
+    
     return AppBar(
       automaticallyImplyLeading: false,
       backgroundColor: Colors.white,
@@ -60,16 +64,27 @@ class NavAppBar extends StatelessWidget implements PreferredSizeWidget {
           GestureDetector(
             onTap: () => Navigator.pushNamed(context, '/profile'),
             child: CircleAvatar(
-              backgroundColor: Colors.grey[200],
+              backgroundColor: user != null 
+                  ? Theme.of(context).primaryColor.withOpacity(0.2)
+                  : Colors.grey[200],
               radius: 16,
-              child: const Text(
-                'J',
-                style: TextStyle(
-                  color: Colors.black54,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+              backgroundImage: user?.profilePicture != null && user!.profilePicture!.isNotEmpty
+                  ? NetworkImage(user.profilePicture!) as ImageProvider
+                  : null,
+              child: user?.profilePicture == null || user!.profilePicture!.isEmpty
+                  ? Text(
+                      user != null && user.name.isNotEmpty 
+                          ? user.name[0].toUpperCase()
+                          : 'U',
+                      style: TextStyle(
+                        color: user != null 
+                            ? Theme.of(context).primaryColor
+                            : Colors.black54,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    )
+                  : null,
             ),
           ),
         ],
